@@ -1,25 +1,33 @@
 package net.onepeace.signshops.listeners;
 
-import net.onepeace.signshops.PlayerSign;
-import org.bukkit.entity.Player;
+import com.almworks.sqlite4java.SQLiteException;
+import net.onepeace.signshops.SignShopCooldowns;
+import net.onepeace.signshops.data.UsesDatabase;
+import org.bukkit.ChatColor;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.Action;
+import org.bukkit.inventory.ItemStack;
 import org.wargamer2010.signshop.events.SSPostTransactionEvent;
 import org.wargamer2010.signshop.events.SSPreTransactionEvent;
 import org.wargamer2010.signshop.player.SignShopPlayer;
 
-import java.util.HashMap;
-
 public class ShopUse implements Listener {
-    public static HashMap<PlayerSign, Integer> itemLimit;
-    public static HashMap<PlayerSign, Float> moneyLimit;
-    public static HashMap<PlayerSign, Long> cooldown;
 
     public static int itemLimits = 100;
     public static float moneyLimits = 1000;
     public static long cooldownMillis = 10000;
 
-    public ShopUse(itemLimit, moneyLimit, cooldown) //TODO: load hashmaps from file in onenable, and pass them to here.
+    private UsesDatabase database;
+    private SignShopCooldowns plugin;
+
+    public ShopUse(SignShopCooldowns plugin, UsesDatabase database)
+    {
+        this.plugin = plugin;
+        this.database = database;
+    }
+
+     //TODO: load hashmaps from file in onenable, and pass them to here.
 
     //TODO: check if the player has used the item limit for sign, check if the player has used the money limit
     //check pretransaction to see if transaction would violate limit (or if cooldown is in effect0
@@ -36,54 +44,48 @@ public class ShopUse implements Listener {
     @EventHandler
     public void onSSPostTransactionEvent(SSPostTransactionEvent event) {
         SignShopPlayer player = event.getPlayer();
-        PlayerSign playerSign = new PlayerSign(player.getPlayer(), event.getShop().getSignLocation().getBlock());
-
-        int itemBefore = 0;
-        if(itemLimit.containsKey(playerSign)) itemBefore = itemLimit.get(playerSign);
-        itemLimit.put(playerSign, itemBefore);
-        float moneyBefore = 0F;
-
-
-
-        if(itemLimit.get(playerSign) >= itemLimits) {
-            player.sendMessage("The item limit for this shop has been reached: " + itemLimit.get(playerSign) + "/" + itemLimits);
-            itemLimit.remove(playerSign);
-            moneyLimit.remove(playerSign);
-            cooldown.put(playerSign, System.currentTimeMillis());
-        }else if(moneyLimit.get(playerSign) >= moneyLimits ) {
-            player.sendMessage("The money limit for this shop has been reached: " + moneyLimit.get(playerSign) + "/" + moneyLimits);
-            itemLimit.remove(playerSign);
-            moneyLimit.remove(playerSign);
-            cooldown.put(playerSign, System.currentTimeMillis());
+        try {
+            database.insertUse(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), getItemAmount(event.getItems()), event.getPrice());
+        } catch (SQLiteException e) {
+            e.printStackTrace();
         }
+    }
 
+    private int getItemAmount(ItemStack[] stacks) {
+        int itemAmount = 0;
+        for(ItemStack stack : stacks) {
+            itemAmount += stack.getAmount();
+        }
+        return itemAmount;
     }
 
     @EventHandler
     public void onSSPreTransactionEvent(SSPreTransactionEvent event) {
-        SignShopPlayer player = event.getPlayer();
-        PlayerSign playerSign = new PlayerSign(player.getPlayer(), event.getShop().getSignLocation().getBlock());
-        if(cooldown.containsKey(playerSign)) {
-            if(cooldown.get(playerSign) + cooldownMillis < System.currentTimeMillis()){
-                long waitingtime = (cooldown.get(playerSign) + cooldownMillis) - System.currentTimeMillis();
-                player.sendMessage("Please wait: " + waitingtime);
+        if(event.isCancelled() || event.getAction() != Action.RIGHT_CLICK_BLOCK || !event.getRequirementsOK())
+            return;
+
+        try {
+            SignShopPlayer player = event.getPlayer();
+            long since = System.currentTimeMillis() - 60L * 60L * 1000L; //1 hour
+            int itemSum = database.getItemSum(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), since); //items sold in since since time
+
+            if(getItemAmount(event.getItems()) + itemSum > itemLimits) {
+                player.sendMessage(ChatColor.RED + "Cannot complete sale!");
+                player.sendMessage("You can only sell up to "  + itemLimits + " items within " + since);
                 event.setCancelled(true);
                 return;
             }
-        }
-        if(itemLimit.containsKey(playerSign)) {
-            int itemsSoFar = itemLimit.get(playerSign);
-            if(event.getItems().length + itemsSoFar > itemLimits) {
+            double priceSum = database.getMoneySum(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), since);
+
+            if(priceSum + event.getPrice() > moneyLimits) {
+                player.sendMessage(ChatColor.RED + "Cannot complete sale!");
+                player.sendMessage("You can only sell up to $" + moneyLimits + " within " + since);
                 event.setCancelled(true);
-                player.sendMessage("This transaction goes above the item limit of " + itemLimits);
+                return;
             }
-        } else if (moneyLimit.containsKey(playerSign)) {
-            float moneySoFar = moneyLimit.get(playerSign);
-            if(event.getPrice() + moneySoFar > moneyLimits)
-            {
-                event.setCancelled(true);
-                player.sendMessage("This transaction goes above the money limit of " + moneyLimits);
-            }
+        } catch (SQLiteException ex){
+            event.getPlayer().sendMessage(ChatColor.RED + "An internal error has occurred!!");
+            ex.printStackTrace();
         }
     }
 }
