@@ -1,12 +1,13 @@
-package net.onepeace.signshops.tasks;
+package net.onepeace.signshops.cooldowns.tasks;
 
-import com.almworks.sqlite4java.SQLiteException;
-import net.onepeace.signshops.data.UsesDatabase;
+import net.onepeace.signshops.cooldowns.data.UsesDatabase;
 import org.bukkit.scheduler.BukkitRunnable;
 
+import java.sql.SQLException;
+
 public class Cleanup extends BukkitRunnable {
-    private UsesDatabase database;
-    private Long before;
+    private final UsesDatabase database;
+    private final Long before;
 
     public Cleanup(UsesDatabase database, Long before) {
         this.database = database;
@@ -17,7 +18,7 @@ public class Cleanup extends BukkitRunnable {
     public void run() {
         try {
             database.cleanup(System.currentTimeMillis() - before);
-        } catch (SQLiteException e) {
+        } catch (SQLException e) {
             e.printStackTrace();
         }
     }

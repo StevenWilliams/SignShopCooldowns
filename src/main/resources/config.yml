@@ -1,6 +1,12 @@
-name: ${project.name}
-version: ${project.version}
-main: ${project.groupId}.${project.artifactId}.${project.name}
-description: |
-    ${project.description}
-authors: [puppy3276]
+#seconds
+#cleanup - how much data to keep (in seconds) - default: 2 days
+#period (in seconds)
+#item-limit (per period)
+cleanup: 172800
+types:
+  "[iSell]":
+    item-limit: 10
+    money-limit: 100
+    period: 120
+    wait-msg-item: "You can only sell 10 items within 2 minutes at this shop. Try again later!"
+    wait-msg-money: "You can only make up to $100 within 2 minutes at this shop. Try again later!"
