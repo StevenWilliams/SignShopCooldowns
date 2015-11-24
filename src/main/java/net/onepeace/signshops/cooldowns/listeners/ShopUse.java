@@ -47,7 +47,7 @@ public class ShopUse implements Listener {
 
         Sign sign = (Sign) event.getSign().getState();
 
-        if(!type.equals(ChatColor.stripColor(sign.getLine(0)))) return;
+        if(!type.equalsIgnoreCase(ChatColor.stripColor(sign.getLine(0)))) return;
 
         try {
             database.insertUse(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), getItemAmount(event.getItems()), event.getPrice());
@@ -72,7 +72,7 @@ public class ShopUse implements Listener {
 
         Sign sign = (Sign) event.getSign().getState();
 
-        if(!type.equals(ChatColor.stripColor(sign.getLine(0)))) return;
+        if(!type.equalsIgnoreCase(ChatColor.stripColor(sign.getLine(0)))) return;
 
         try {
             SignShopPlayer player = event.getPlayer();
