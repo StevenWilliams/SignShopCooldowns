@@ -1,5 +1,5 @@
 # SignShopCooldowns
-SignShop Cooldowns Plugin
+SignShop cooldowns plugin using SQLite.
 
 **Licence**
 ============
