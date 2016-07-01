@@ -4,11 +4,11 @@ import net.onepeace.signshops.cooldowns.SignShopCooldowns;
 import net.onepeace.signshops.cooldowns.data.UsesDatabase;
 import org.bukkit.ChatColor;
 import org.bukkit.block.Sign;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
-import org.bukkit.inventory.ItemStack;
-import org.wargamer2010.signshop.events.SSPostTransactionEvent;
 import org.wargamer2010.signshop.events.SSPreTransactionEvent;
 import org.wargamer2010.signshop.player.SignShopPlayer;
 
@@ -18,53 +18,42 @@ public class ShopUse implements Listener {
 
     private final int itemLimits;
     private final double moneyLimits;
-    private final long period;
+    final long period;
 
-    private final UsesDatabase database;
-    private final SignShopCooldowns plugin;
-    private final String type;
+    final UsesDatabase database;
+    final SignShopCooldowns plugin;
+    final String type;
 
     private final String waitMsgItem;
     private final String waitMsgMoney;
 
-    public ShopUse(SignShopCooldowns plugin, String type, UsesDatabase database)
+
+    public ShopUse(SignShopCooldowns plugin, ConfigurationSection section, String type, UsesDatabase database)
     {
         this.plugin = plugin;
         this.database = database;
         this.type = type;
-        this.itemLimits = plugin.getConfig().getInt("types." + type + ".item-limit");
-        this.moneyLimits = plugin.getConfig().getDouble("types." + type + ".money-limit");
-        this.period = plugin.getConfig().getLong("types." + type + ".period") * 1000L;
-        this.waitMsgItem = plugin.getConfig().getString("types." + type + ".wait-msg-item");
-        this.waitMsgMoney = plugin.getConfig().getString("types." + type + ".wait-msg-money");
+        this.itemLimits = section.getInt(type + ".item-limit");
+        this.moneyLimits = section.getDouble(type + ".money-limit");
+        this.period = section.getLong(type + ".period") * 1000L;
+        this.waitMsgItem = section.getString(type + ".wait-msg-item");
+        this.waitMsgMoney = section.getString(type + ".wait-msg-money");
+
+    }
+
+    double getPriceSum(SSPreTransactionEvent event) throws SQLException {
+        double priceSum = database.getMoneySum(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(),System.currentTimeMillis() - period);
+        return priceSum;
+    }
+
+    int getItemSum(SSPreTransactionEvent event) throws SQLException {
+        int itemSum = database.getItemSum(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), System.currentTimeMillis() - period); //items sold in since since time
+        return itemSum;
     }
 
 
-    @EventHandler
-    public void onSSPostTransactionEvent(SSPostTransactionEvent event) {
-        if(event.isCancelled() || event.getAction() != Action.RIGHT_CLICK_BLOCK || !event.getRequirementsOK())
-            return;
 
-        Sign sign = (Sign) event.getSign().getState();
-
-        if(!type.equalsIgnoreCase(ChatColor.stripColor(sign.getLine(0)))) return;
-
-        try {
-            database.insertUse(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), getItemAmount(event.getItems()), event.getPrice());
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private int getItemAmount(ItemStack[] stacks) {
-        int itemAmount = 0;
-        for(ItemStack stack : stacks) {
-            itemAmount += stack.getAmount();
-        }
-        return itemAmount;
-    }
-
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST)
     public void onSSPreTransactionEvent(SSPreTransactionEvent event) {
 
         if(event.isCancelled() || event.getAction() != Action.RIGHT_CLICK_BLOCK || !event.getRequirementsOK())
@@ -76,17 +65,16 @@ public class ShopUse implements Listener {
 
         try {
             SignShopPlayer player = event.getPlayer();
-            long since = period;
-            int itemSum = database.getItemSum(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), System.currentTimeMillis() - since); //items sold in since since time
+            int itemSum = getItemSum(event);
 
-            if(getItemAmount(event.getItems()) + itemSum > itemLimits) {
+            if(SignShopCooldowns.getItemAmount(event.getItems()) + itemSum > itemLimits) {
                 player.sendMessage(ChatColor.RED + "Cannot complete sale!");
                 player.sendMessage(ChatColor.translateAlternateColorCodes('&', waitMsgItem));
                 event.setCancelled(true);
                 return;
             }
-            double priceSum = database.getMoneySum(event.getSign().getLocation(), event.getPlayer().getPlayer().getUniqueId(), since);
 
+            double priceSum = getPriceSum(event);
             if(priceSum + event.getPrice() > moneyLimits) {
                 player.sendMessage(ChatColor.RED + "Cannot complete sale!");
                 player.sendMessage(ChatColor.translateAlternateColorCodes('&', waitMsgMoney));

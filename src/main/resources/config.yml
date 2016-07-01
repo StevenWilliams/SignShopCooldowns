@@ -10,3 +10,10 @@ types:
     period: 120
     wait-msg-item: "You can only sell 10 items within 2 minutes at this shop. Try again later!"
     wait-msg-money: "You can only make up to $100 within 2 minutes at this shop. Try again later!"
+global-types:
+  "[iSell]":
+    item-limit: 20
+    money-limit: 150
+    period: 120
+    wait-msg-item: "You can only sell 20 items within 2 minutes at all iSell shops. Try again later!"
+    wait-msg-money: "You can only make up to $150 within 2 minutes at all iSell shops. Try again later!"
